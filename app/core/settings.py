@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     REDIS_PASSWORD: Optional[str] = None
     
     # Logging
-    LOG_LEVEL: str = Field(default="INFO", pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
+    LOG_LEVEL: str = Field(default="DEBUG", pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
     LOG_FILE: str = "./logs/bot.log"
     LOG_ROTATION: str = "100 MB"
     LOG_RETENTION: str = "30 days"

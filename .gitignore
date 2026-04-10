@@ -36,6 +36,9 @@ ENV/
 *.swo
 *~
 
+# Qwen Code
+.qwen/
+
 # Database
 *.db
 *.sqlite

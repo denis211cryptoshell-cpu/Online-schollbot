@@ -22,6 +22,7 @@ from app.handlers.export_handler import router as export_router
 from app.handlers.callback_handler import router as callback_router
 from app.handlers.manager_commands import router as manager_commands_router
 from app.handlers.ban_handler import router as ban_router
+from app.middleware import RateLimitMiddleware, CallbackRateLimitMiddleware
 
 
 async def on_startup(bot: Bot):
@@ -101,7 +102,12 @@ async def main():
     # Инициализация диспетчера с FSM storage
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
-    
+
+    # Подключение middleware для rate limiting
+    dp.message.middleware(RateLimitMiddleware())
+    dp.callback_query.middleware(CallbackRateLimitMiddleware())
+    log.info("Rate limiting middleware enabled")
+
     # Регистрация роутеров (порядок важен!)
     dp.include_router(callback_router)        # Inline callback (первый!)
     dp.include_router(ban_router)             # Бан/разбан

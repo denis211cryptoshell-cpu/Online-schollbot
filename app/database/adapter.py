@@ -1,7 +1,7 @@
 """
 Адаптер базы данных - поддержка SQLite и PostgreSQL
 """
-from typing import Optional
+from typing import Optional, AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from app.core.settings import settings
@@ -59,11 +59,11 @@ class DatabaseAdapter:
             self._initialized = False
             log.info("Database connection closed")
     
-    async def get_session(self) -> AsyncSession:
+    async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
         """Получить сессию базы данных"""
         if not self._initialized:
             await self.initialize()
-        
+
         async with self.session_factory() as session:
             try:
                 yield session

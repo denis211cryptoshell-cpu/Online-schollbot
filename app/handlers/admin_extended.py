@@ -9,6 +9,7 @@ from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy import select, func
 from app.core.logger import log
 from app.core.settings import settings
+from app.keyboards.admin_faq_kb import get_faq_fsm_back_keyboard
 from app.database.adapter import db_adapter
 from app.services.analytics_service import analytics_service
 from app.services.faq_service import faq_service
@@ -142,28 +143,8 @@ async def cmd_top_faq(message: Message):
 
 
 # ========== УПРАВЛЕНИЕ FAQ ==========
-
-@router.message(F.text == "📝 Управление FAQ")
-async def faq_management(message: Message):
-    """Управление базой знаний FAQ"""
-    if message.from_user.id not in settings.admin_ids:
-        return
-    
-    await message.answer(
-        "📝 <b>Управление базой знаний</b>\n\n"
-        "Выберите действие:\n\n"
-        "• ➕ Добавить вопрос\n"
-        "• 📋 Список вопросов\n"
-        "• ✏️ Редактировать\n"
-        "• 🗑 Удалить вопрос\n\n"
-        "Или используйте команды:\n"
-        "<code>/add_faq</code> - добавить\n"
-        "<code>/list_faq</code> - список\n"
-        "<code>/edit_faq</code> - редактировать\n"
-        "<code>/delete_faq</code> - удалить",
-        parse_mode="HTML"
-    )
-
+# Обработчик кнопки "📝 Управление FAQ" перенесён в admin_handler.py
+# (там добавлены inline-кнопки вместо текста)
 
 @router.message(Command("add_faq"))
 async def cmd_add_faq(message: Message, state: FSMContext):
@@ -187,9 +168,12 @@ async def process_question_ru(message: Message, state: FSMContext):
         await state.clear()
         await message.answer("❌ Отменено")
         return
-    
+
     await state.update_data(question_ru=message.text)
-    await message.answer("✅ Теперь введите ответ на русском:")
+    await message.answer(
+        "✅ Теперь введите ответ на русском:",
+        reply_markup=get_faq_fsm_back_keyboard()
+    )
     await state.set_state(FAQAdd.waiting_for_answer_ru)
 
 
@@ -200,9 +184,12 @@ async def process_answer_ru(message: Message, state: FSMContext):
         await state.clear()
         await message.answer("❌ Отменено")
         return
-    
+
     await state.update_data(answer_ru=message.text)
-    await message.answer("✅ Теперь введите вопрос на английском:")
+    await message.answer(
+        "✅ Теперь введите вопрос на английском:",
+        reply_markup=get_faq_fsm_back_keyboard()
+    )
     await state.set_state(FAQAdd.waiting_for_question_en)
 
 
@@ -213,9 +200,12 @@ async def process_question_en(message: Message, state: FSMContext):
         await state.clear()
         await message.answer("❌ Отменено")
         return
-    
+
     await state.update_data(question_en=message.text)
-    await message.answer("✅ Теперь введите ответ на английском:")
+    await message.answer(
+        "✅ Теперь введите ответ на английском:",
+        reply_markup=get_faq_fsm_back_keyboard()
+    )
     await state.set_state(FAQAdd.waiting_for_answer_en)
 
 
@@ -226,9 +216,12 @@ async def process_answer_en(message: Message, state: FSMContext):
         await state.clear()
         await message.answer("❌ Отменено")
         return
-    
+
     await state.update_data(answer_en=message.text)
-    await message.answer("✅ Теперь введите ключевые слова (через запятую):")
+    await message.answer(
+        "✅ Теперь введите ключевые слова (через запятую):",
+        reply_markup=get_faq_fsm_back_keyboard()
+    )
     await state.set_state(FAQAdd.waiting_for_keywords)
 
 

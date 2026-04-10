@@ -353,12 +353,40 @@ async def handle_open_crm(callback: CallbackQuery):
     
     # Формируем ссылку на Google Sheets
     sheets_url = f"https://docs.google.com/spreadsheets/d/{settings.GOOGLE_SHEETS_ID}"
-    
+
     await callback.message.answer(
         f"🔗 <b>Открыть заявку #{lead_id} в CRM:</b>\n\n"
         f"<a href='{sheets_url}'>Google Sheets</a>",
         parse_mode="HTML",
         disable_web_page_preview=True
     )
-    
+
+    await callback.answer()
+
+
+# ========== FAQ FSM ОТМЕНА (для админов) ==========
+
+@router.callback_query(F.data == "faq_cancel_fsm")
+async def handle_faq_fsm_cancel(callback: CallbackQuery, state: FSMContext):
+    """Отмена FSM состояния при добавлении/редактировании FAQ"""
+    if callback.from_user.id not in settings.admin_ids:
+        await callback.answer("⛔ Нет прав", show_alert=True)
+        return
+
+    from app.keyboards.admin_faq_kb import get_faq_management_inline_keyboard
+
+    await state.clear()
+    log.info(f"[FAQ] Admin {callback.from_user.id} cancelled FSM state via inline button")
+    try:
+        await callback.message.edit_text(
+            "📝 <b>Управление базой знаний</b>\n\nВыберите действие:",
+            parse_mode="HTML",
+            reply_markup=get_faq_management_inline_keyboard()
+        )
+    except Exception:
+        await callback.message.answer(
+            "📝 <b>Управление базой знаний</b>\n\nВыберите действие:",
+            parse_mode="HTML",
+            reply_markup=get_faq_management_inline_keyboard()
+        )
     await callback.answer()
