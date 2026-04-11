@@ -22,6 +22,7 @@ from app.handlers.export_handler import router as export_router
 from app.handlers.callback_handler import router as callback_router
 from app.handlers.manager_commands import router as manager_commands_router
 from app.handlers.ban_handler import router as ban_router
+from app.handlers.ban_management import router as ban_management_router
 from app.middleware import RateLimitMiddleware, CallbackRateLimitMiddleware
 
 
@@ -109,13 +110,14 @@ async def main():
     log.info("Rate limiting middleware enabled")
 
     # Регистрация роутеров (порядок важен!)
-    dp.include_router(callback_router)        # Inline callback (первый!)
-    dp.include_router(ban_router)             # Бан/разбан
-    dp.include_router(admin_extended_router)  # Расширенная админка
-    dp.include_router(manager_commands_router)  # Команды менеджера
-    dp.include_router(export_router)          # Экспорт и CRM команды
+    dp.include_router(callback_router)             # Inline callback (первый!)
+    dp.include_router(ban_router)                  # Бан/разбан (команды)
+    dp.include_router(ban_management_router)       # Управление банами (UI)
+    dp.include_router(admin_extended_router)       # Расширенная админка
+    dp.include_router(manager_commands_router)     # Команды менеджера
+    dp.include_router(export_router)               # Экспорт и CRM команды
     dp.include_router(admin_router)
-    dp.include_router(main_router)            # Основной обработчик (с проверкой намерений)
+    dp.include_router(main_router)                 # Основной обработчик (с проверкой намерений)
     
     # Регистрация обработчиков startup/shutdown
     dp.startup.register(on_startup)

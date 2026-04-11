@@ -26,6 +26,7 @@ def get_admin_main_keyboard() -> ReplyKeyboardMarkup:
             ],
             [
                 KeyboardButton(text="🔄 Обновить кэш"),
+                KeyboardButton(text="🚫 Управление банами"),
             ]
         ],
         resize_keyboard=True

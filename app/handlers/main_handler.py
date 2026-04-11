@@ -3,10 +3,11 @@
 """
 import re
 from aiogram import Router, F
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.exceptions import TelegramBadRequest
 from sqlalchemy import select
 from app.core.logger import log
 from app.core.settings import settings
@@ -16,6 +17,7 @@ import app.services.notification_service as notification_service
 from app.services.ban_service import ban_service
 from app.database.adapter import db_adapter
 from app.database.models import Lead
+from app.keyboards.inline_kb import get_cancel_keyboard
 
 router = Router()
 
@@ -155,41 +157,36 @@ async def process_phone(message: Message, state: FSMContext):
     """Обработка введенного телефона"""
     text = message.text
     user_id = message.from_user.id
-    
-    # Проверяем команду отмены
-    if text.lower() in ['/cancel', 'отмена', 'отменить']:
-        await state.clear()
-        await message.answer("❌ Заявка отменена.\n\nЕсли передумаете - просто напишите 'хочу записаться'")
-        log.info(f"Lead collection cancelled for user {user_id}")
-        return
-    
+
     # Пытаемся извлечь телефон
     phone = extract_phone_number(text)
-    
+
     if not phone:
         # Пробуем email
         email = extract_email(text)
         if email:
             phone = email
         else:
+            # Отправляем новое сообщение с подсказкой и кнопкой отмены
             await message.answer(
                 "⚠️ Я не смог распознать номер телефона или email.\n\n"
                 "Пожалуйста, напишите:\n"
                 "• Телефон: +7 (999) 123-45-67\n"
-                "• Или email: example@mail.ru\n\n"
-                "Или напишите /cancel для отмены."
+                "• Или email: example@mail.ru",
+                reply_markup=get_cancel_keyboard()
             )
             return
-    
-    # Получаем сохраненный lead_id
+
+    # Получаем сохраненные данные
     data = await state.get_data()
     lead_id = data.get('lead_id')
-    
+    message_id = data.get('message_id')
+
     if not lead_id:
         await state.clear()
         await message.answer("⚠️ Произошла ошибка. Пожалуйста, напишите 'хочу записаться' снова")
         return
-    
+
     async for db_session in db_adapter.get_session():
         try:
             # Находим заявку и обновляем контакт
@@ -197,47 +194,141 @@ async def process_phone(message: Message, state: FSMContext):
                 select(Lead).where(Lead.id == lead_id)
             )
             lead = result.scalar_one_or_none()
-            
+
             if lead:
                 lead.contact = phone
                 await db_session.commit()
-                
+
                 # Обновляем контакт в CRM (Google Sheets)
                 try:
                     from app.services.crm_adapter import crm_adapter
                     await crm_adapter.update_lead_contact(lead.id, phone)
                 except Exception as e:
                     log.error(f"CRM update contact error (non-critical): {e}")
-                
+
                 # Отправляем уведомление менеджеру
                 if notification_service.manager_notification_service:
-                    message_id = await notification_service.manager_notification_service.send_new_lead_notification(lead)
-                    
+                    msg_id = await notification_service.manager_notification_service.send_new_lead_notification(lead)
+
                     # Сохраняем ID сообщения
                     result = await db_session.execute(
                         select(Lead).where(Lead.id == lead_id)
                     )
                     lead = result.scalar_one()
-                    lead.manager_chat_message_id = message_id
+                    lead.manager_chat_message_id = msg_id
                     await db_session.commit()
-                
-                await message.answer(
-                    "✅ Отлично! Ваша заявка принята!\n\n"
-                    f"📞 Менеджер свяжется с вами в ближайшее время.\n"
-                    f"Обычно мы отвечаем в течение 1 часа.\n\n"
-                    f"🆔 Номер заявки: #{lead.id}\n"
-                    f"Спасибо за интерес к нашему курсу! 🎓"
-                )
-                
+
+                # Редактируем исходное сообщение с запросом телефона
+                if message_id:
+                    try:
+                        await message.bot.edit_message_text(
+                            text="✅ Отлично! Ваша заявка принята!\n\n"
+                                 f"📞 Менеджер свяжется с вами в ближайшее время.\n"
+                                 f"Обычно мы отвечаем в течение 1 часа.\n\n"
+                                 f"🆔 Номер заявки: #{lead.id}\n"
+                                 f"Спасибо за интерес к нашему курсу! 🎓",
+                            chat_id=message.chat.id,
+                            message_id=message_id,
+                            reply_markup=None
+                        )
+                    except TelegramBadRequest as e:
+                        log.error(f"Error editing message: {e}")
+                        # Fallback: отправляем новое сообщение
+                        await message.answer(
+                            "✅ Отлично! Ваша заявка принята!\n\n"
+                            f"📞 Менеджер свяжется с вами в ближайшее время.\n"
+                            f"Обычно мы отвечаем в течение 1 часа.\n\n"
+                            f"🆔 Номер заявки: #{lead.id}\n"
+                            f"Спасибо за интерес к нашему курсу! 🎓"
+                        )
+                else:
+                    # Если нет ID сообщения, отправляем новое
+                    await message.answer(
+                        "✅ Отлично! Ваша заявка принята!\n\n"
+                        f"📞 Менеджер свяжется с вами в ближайшее время.\n"
+                        f"Обычно мы отвечаем в течение 1 часа.\n\n"
+                        f"🆔 Номер заявки: #{lead.id}\n"
+                        f"Спасибо за интерес к нашему курсу! 🎓"
+                    )
+
                 log.info(f"Contact collected for lead #{lead_id}: {phone}")
             else:
                 await message.answer("⚠️ Произошла ошибка. Пожалуйста, напишите /start")
-            
+
         except Exception as e:
             log.error(f"Error processing phone: {e}")
             await message.answer("⚠️ Произошла ошибка. Попробуйте позже.")
         finally:
             await state.clear()
+
+
+@router.callback_query(F.data == "cancel_lead_collection")
+async def cancel_lead_collection(callback: CallbackQuery, state: FSMContext):
+    """Обработка отмены сбора контактов через inline кнопку"""
+    user_id = callback.from_user.id
+    username = callback.from_user.username or "unknown"
+    
+    log.info(f"Cancel button pressed by user {user_id} (@{username})")
+    
+    try:
+        # Получаем ID сообщения для редактирования
+        data = await state.get_data()
+        message_id = data.get('message_id')
+        lead_id = data.get('lead_id')
+        
+        log.debug(f"State data for user {user_id}: message_id={message_id}, lead_id={lead_id}")
+        
+        # Очищаем состояние
+        await state.clear()
+        log.info(f"FSM state cleared for user {user_id}")
+        
+        # Определяем какое сообщение редактировать
+        target_message_id = message_id if message_id else callback.message.message_id
+        chat_id = callback.message.chat.id
+        
+        log.info(f"Editing message: chat_id={chat_id}, message_id={target_message_id}")
+        
+        # Редактируем сообщение
+        await callback.bot.edit_message_text(
+            text="❌ Заявка отменена.\n\n"
+                 "Если передумаете - просто напишите 'хочу записаться'",
+            chat_id=chat_id,
+            message_id=target_message_id,
+            reply_markup=None
+        )
+        
+        log.info(f"Message successfully edited for user {user_id}")
+        
+    except TelegramBadRequest as e:
+        log.error(
+            f"TelegramBadRequest when editing message for user {user_id} "
+            f"(@{username}): {e}\n"
+            f"Details: chat_id={callback.message.chat.id}, "
+            f"message_id={data.get('message_id', 'N/A')}"
+        )
+        # Пытаемся хотя бы показать уведомление
+        try:
+            await callback.answer("❌ Заявка отменена", show_alert=False)
+            log.info(f"Fallback callback answer sent for user {user_id}")
+        except Exception as inner_e:
+            log.error(
+                f"Critical error: even callback.answer failed for user {user_id}: {inner_e}"
+            )
+    except Exception as e:
+        log.error(
+            f"Unexpected error in cancel_lead_collection for user {user_id} "
+            f"(@{username}): {type(e).__name__}: {e}",
+            exc_info=True
+        )
+        try:
+            await callback.answer(
+                "⚠️ Произошла ошибка при отмене. Попробуйте ещё раз или напишите /start",
+                show_alert=True
+            )
+        except Exception:
+            log.error("Failed to send error callback answer")
+    
+    log.info(f"Cancel flow completed for user {user_id} (@{username})")
 
 
 @router.message(F.text)
@@ -294,16 +385,20 @@ async def handle_message(message: Message, state: FSMContext):
                         language=language
                     )
                     
-                    await state.set_data({'lead_id': lead.id})
+                    await state.set_data({'lead_id': lead.id, 'message_id': None})
                     await state.set_state(ContactCollection.waiting_for_phone)
-                    
-                    await message.answer(
+
+                    # Отправляем сообщение и сохраняем его ID
+                    sent_message = await message.answer(
                         "📝 Отлично! Для оформления заявки мне нужен ваш контактный телефон.\n\n"
                         "Пожалуйста, напишите ваш номер телефона:\n"
                         "• +7 (999) 123-45-67\n"
-                        "• +79991234567\n\n"
-                        "Или напишите /cancel для отмены."
+                        "• +79991234567",
+                        reply_markup=get_cancel_keyboard()
                     )
+                    
+                    # Сохраняем ID сообщения для последующего редактирования
+                    await state.set_data({'lead_id': lead.id, 'message_id': sent_message.message_id})
                     log.info(f"Waiting for phone from user {user_id}, lead #{lead.id}")
                 
                 return

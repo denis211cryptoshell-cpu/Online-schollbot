@@ -81,7 +81,7 @@ def get_pagination_keyboard(page: int, has_next: bool) -> InlineKeyboardMarkup:
 def get_yes_no_keyboard(action: str, lead_id: int = 0) -> InlineKeyboardMarkup:
     """
     Inline клавиатура Да/Нет для подтверждений
-    
+
     Args:
         action: Действие (для callback_data)
         lead_id: ID заявки
@@ -91,6 +91,20 @@ def get_yes_no_keyboard(action: str, lead_id: int = 0) -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(text="✅ Да", callback_data=f"confirm_{action}_{lead_id}"),
                 InlineKeyboardButton(text="❌ Нет", callback_data=f"cancel_{action}_{lead_id}"),
+            ]
+        ]
+    )
+    return keyboard
+
+
+def get_cancel_keyboard() -> InlineKeyboardMarkup:
+    """
+    Inline клавиатура с кнопкой отмены для формы сбора контактов
+    """
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="❌ Отменить заявку", callback_data="cancel_lead_collection"),
             ]
         ]
     )
