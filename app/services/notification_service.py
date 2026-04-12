@@ -8,6 +8,7 @@ from app.database.models import Lead, LeadStatus
 from app.core.settings import settings
 from app.core.logger import log
 from app.keyboards.inline_kb import get_lead_status_keyboard
+from app.utils.phone_formatter import format_phone_number
 
 
 class ManagerNotificationService:
@@ -153,7 +154,7 @@ class ManagerNotificationService:
         )
         
         if lead.contact:
-            text += f"📞 <b>Контакт:</b> <code>{lead.contact}</code>\n"
+            text += f"📞 <b>Контакт:</b> <code>{format_phone_number(lead.contact)}</code>\n"
         
         text += (
             f"\n💬 <b>Сообщение:</b>\n"

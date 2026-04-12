@@ -32,6 +32,7 @@
 
 ### CRM:
 - ✅ Google Sheets — автоматическая запись заявок
+- ✅ **Форматирование номеров** (`7 999 123 45 67` без `#ERROR!`)
 - ✅ Автоматическое обновление контактов
 - ✅ Синхронизация статусов
 - ✅ Адаптер для переключения на локальную БД
@@ -266,6 +267,8 @@ RATE_LIMIT_LEADS=3
 │   ├── middleware/       # Middleware
 │   │   ├── __init__.py         # Rate limiting middleware
 │   │   └── rate_limit.py       # Ядро rate limiter
+│   ├── utils/            # Утилиты
+│   │   └── phone_formatter.py   # Форматирование номеров телефонов
 │   └── services/       # Бизнес-логика
 │       ├── faq_service.py           # FAQ и кэширование
 │       ├── lead_service.py          # Заявки
