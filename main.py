@@ -7,6 +7,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.storage.redis import RedisStorage
 
 from app.core.settings import settings
 from app.core.logger import log
@@ -101,7 +102,25 @@ async def main():
     )
     
     # Инициализация диспетчера с FSM storage
-    storage = MemoryStorage()
+    # Используем RedisStorage для сохранения состояний при перезапуске
+    try:
+        import redis.asyncio as aioredis
+        redis_instance = aioredis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            socket_timeout=5,
+            socket_connect_timeout=5
+        )
+        storage = RedisStorage(
+            redis=redis_instance,
+            state_ttl=settings.FAQ_CACHE_TTL,
+            data_ttl=settings.LEAD_CACHE_TTL
+        )
+        log.info("RedisStorage initialized for FSM states")
+    except Exception as e:
+        log.warning(f"RedisStorage failed, falling back to MemoryStorage: {e}")
+        storage = MemoryStorage()
+
     dp = Dispatcher(storage=storage)
 
     # Подключение middleware для rate limiting
