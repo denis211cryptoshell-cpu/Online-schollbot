@@ -9,7 +9,7 @@ from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy import select
 from app.core.logger import log
 from app.core.settings import settings
-from app.keyboards.manager_kb import get_admin_main_keyboard
+from app.keyboards.admin_ban_kb import get_admin_main_inline_keyboard
 from app.keyboards.admin_faq_kb import (
     get_faq_management_inline_keyboard,
     get_faq_edit_select_keyboard,
@@ -39,120 +39,165 @@ async def cmd_admin(message: Message):
         log.warning(f"Unauthorized admin access attempt from {message.from_user.id}")
         await message.answer("⛔ У вас нет прав администратора.")
         return
-    
+
     log.info(f"Admin panel opened by {message.from_user.id}")
     await message.answer(
         "🛠 Админ-панель бота\n\nВыберите действие:",
-        reply_markup=get_admin_main_keyboard()
+        reply_markup=get_admin_main_inline_keyboard()
     )
 
 
-@router.message(F.text == "📊 Статистика за день")
-async def stats_day(message: Message):
+# ========== INLINE КНОПКИ АДМИН-ПАНЕЛИ ==========
+
+@router.callback_query(F.data == "stats_day")
+async def callback_stats_day(callback: CallbackQuery):
     """Статистика за день"""
-    if message.from_user.id not in settings.admin_ids:
+    if callback.from_user.id not in settings.admin_ids:
+        await callback.answer("⛔ Нет прав", show_alert=True)
         return
-    
+
+    log.info(f"[Admin] Admin {callback.from_user.id} clicked: stats_day")
+
     async for db_session in db_adapter.get_session():
         try:
             stats = await lead_service.get_statistics(db_session, days=1)
-            
+
             text = (
                 f"📊 Статистика за день ({stats['start_date']})\n\n"
                 f"📝 Всего заявок: {stats['total_leads']}\n"
             )
-            
+
             for status, count in stats['status_breakdown'].items():
                 emoji = {"new": "🆕", "accepted": "✅", "callback": "📞", "rejected": "❌"}.get(status, "📋")
                 text += f"{emoji} {status}: {count}\n"
-            
-            await message.answer(text)
-            
+
+            try:
+                await callback.message.edit_text(text, reply_markup=get_admin_main_inline_keyboard())
+            except Exception:
+                await callback.message.answer(text, reply_markup=get_admin_main_inline_keyboard())
+
         except Exception as e:
             log.error(f"Error getting daily stats: {e}")
-            await message.answer("⚠️ Ошибка при получении статистики")
+            await callback.answer("⚠️ Ошибка при получении статистики", show_alert=True)
+
+        break
+
+    await callback.answer()
 
 
-@router.message(F.text == "📈 Статистика за неделю")
-async def stats_week(message: Message):
+@router.callback_query(F.data == "stats_week")
+async def callback_stats_week(callback: CallbackQuery):
     """Статистика за неделю"""
-    if message.from_user.id not in settings.admin_ids:
+    if callback.from_user.id not in settings.admin_ids:
+        await callback.answer("⛔ Нет прав", show_alert=True)
         return
-    
+
+    log.info(f"[Admin] Admin {callback.from_user.id} clicked: stats_week")
+
     async for db_session in db_adapter.get_session():
         try:
             stats = await lead_service.get_statistics(db_session, days=7)
-            
+
             text = (
                 f"📈 Статистика за неделю ({stats['start_date']} - {stats['end_date']})\n\n"
                 f"📝 Всего заявок: {stats['total_leads']}\n"
             )
-            
+
             for status, count in stats['status_breakdown'].items():
                 emoji = {"new": "🆕", "accepted": "✅", "callback": "📞", "rejected": "❌"}.get(status, "📋")
                 text += f"{emoji} {status}: {count}\n"
-            
-            await message.answer(text)
-            
+
+            try:
+                await callback.message.edit_text(text, reply_markup=get_admin_main_inline_keyboard())
+            except Exception:
+                await callback.message.answer(text, reply_markup=get_admin_main_inline_keyboard())
+
         except Exception as e:
             log.error(f"Error getting weekly stats: {e}")
-            await message.answer("⚠️ Ошибка при получении статистики")
+            await callback.answer("⚠️ Ошибка при получении статистики", show_alert=True)
+
+        break
+
+    await callback.answer()
 
 
-@router.message(F.text == "📅 Статистика за месяц")
-async def stats_month(message: Message):
+@router.callback_query(F.data == "stats_month")
+async def callback_stats_month(callback: CallbackQuery):
     """Статистика за месяц"""
-    if message.from_user.id not in settings.admin_ids:
+    if callback.from_user.id not in settings.admin_ids:
+        await callback.answer("⛔ Нет прав", show_alert=True)
         return
-    
+
+    log.info(f"[Admin] Admin {callback.from_user.id} clicked: stats_month")
+
     async for db_session in db_adapter.get_session():
         try:
             stats = await lead_service.get_statistics(db_session, days=30)
-            
+
             text = (
                 f"📅 Статистика за месяц ({stats['start_date']} - {stats['end_date']})\n\n"
                 f"📝 Всего заявок: {stats['total_leads']}\n"
             )
-            
+
             for status, count in stats['status_breakdown'].items():
                 emoji = {"new": "🆕", "accepted": "✅", "callback": "📞", "rejected": "❌"}.get(status, "📋")
                 text += f"{emoji} {status}: {count}\n"
-            
-            await message.answer(text)
-            
+
+            try:
+                await callback.message.edit_text(text, reply_markup=get_admin_main_inline_keyboard())
+            except Exception:
+                await callback.message.answer(text, reply_markup=get_admin_main_inline_keyboard())
+
         except Exception as e:
             log.error(f"Error getting monthly stats: {e}")
-            await message.answer("⚠️ Ошибка при получении статистики")
+            await callback.answer("⚠️ Ошибка при получении статистики", show_alert=True)
+
+        break
+
+    await callback.answer()
 
 
-@router.message(F.text == "🔥 Топ вопросов")
-async def top_questions(message: Message):
+@router.callback_query(F.data == "top_questions")
+async def callback_top_questions(callback: CallbackQuery):
     """Топ частых вопросов"""
-    if message.from_user.id not in settings.admin_ids:
+    if callback.from_user.id not in settings.admin_ids:
+        await callback.answer("⛔ Нет прав", show_alert=True)
         return
-    
+
+    log.info(f"[Admin] Admin {callback.from_user.id} clicked: top_questions")
+
     async for db_session in db_adapter.get_session():
         try:
             stats = await lead_service.get_statistics(db_session, days=30)
-            
+
             text = "🔥 Топ-10 частых вопросов за месяц:\n\n"
-            
+
             for i, faq in enumerate(stats['top_faqs'], 1):
                 text += f"{i}. {faq['question']} ({faq['count']} раз)\n"
-            
-            await message.answer(text)
-            
+
+            try:
+                await callback.message.edit_text(text, reply_markup=get_admin_main_inline_keyboard())
+            except Exception:
+                await callback.message.answer(text, reply_markup=get_admin_main_inline_keyboard())
+
         except Exception as e:
             log.error(f"Error getting top questions: {e}")
-            await message.answer("⚠️ Ошибка при получении топа вопросов")
+            await callback.answer("⚠️ Ошибка при получении топа вопросов", show_alert=True)
+
+        break
+
+    await callback.answer()
 
 
-@router.message(F.text == "⏱ Экономия времени")
-async def time_saved(message: Message):
+@router.callback_query(F.data == "time_saved")
+async def callback_time_saved(callback: CallbackQuery):
     """Статистика экономии времени"""
-    if message.from_user.id not in settings.admin_ids:
+    if callback.from_user.id not in settings.admin_ids:
+        await callback.answer("⛔ Нет прав", show_alert=True)
         return
-    
+
+    log.info(f"[Admin] Admin {callback.from_user.id} clicked: time_saved")
+
     async for db_session in db_adapter.get_session():
         try:
             # Примерный расчет: каждый FAQ ответ экономит ~3 минуты
@@ -160,82 +205,119 @@ async def time_saved(message: Message):
             faq_answers = sum(faq['count'] for faq in stats['top_faqs'])
             time_saved_minutes = faq_answers * 3
             time_saved_hours = time_saved_minutes / 60
-            
+
             text = (
                 f"⏱ Экономия времени за неделю:\n\n"
                 f"💬 FAQ ответов: {faq_answers}\n"
                 f"⏰ Сэкономлено времени: {time_saved_hours:.1f} часов\n\n"
                 f"Средняя экономия: ~{time_saved_hours/7:.1f} часов в день"
             )
-            
-            await message.answer(text)
-            
+
+            try:
+                await callback.message.edit_text(text, reply_markup=get_admin_main_inline_keyboard())
+            except Exception:
+                await callback.message.answer(text, reply_markup=get_admin_main_inline_keyboard())
+
         except Exception as e:
             log.error(f"Error calculating time saved: {e}")
-            await message.answer("⚠️ Ошибка при расчете экономии времени")
+            await callback.answer("⚠️ Ошибка при расчете экономии времени", show_alert=True)
+
+        break
+
+    await callback.answer()
 
 
-@router.message(F.text == "📝 Управление FAQ")
-async def faq_management(message: Message):
-    """Управление базой знаний FAQ — показывает inline кнопки"""
-    if message.from_user.id not in settings.admin_ids:
+@router.callback_query(F.data == "faq_management")
+async def callback_faq_management_menu(callback: CallbackQuery):
+    """Управление базой знаний FAQ — inline меню"""
+    if callback.from_user.id not in settings.admin_ids:
+        await callback.answer("⛔ Нет прав", show_alert=True)
         return
 
-    log.info(f"FAQ management opened by admin {message.from_user.id}")
-    await message.answer(
-        "📝 <b>Управление базой знаний</b>\n\n"
-        "Выберите действие:",
-        parse_mode="HTML",
-        reply_markup=get_faq_management_inline_keyboard()
-    )
+    log.info(f"[Admin] Admin {callback.from_user.id} clicked: faq_management")
+    try:
+        await callback.message.edit_text(
+            "📝 <b>Управление базой знаний</b>\n\n"
+            "Выберите действие:",
+            parse_mode="HTML",
+            reply_markup=get_faq_management_inline_keyboard()
+        )
+    except Exception:
+        await callback.message.answer(
+            "📝 <b>Управление базой знаний</b>\n\n"
+            "Выберите действие:",
+            parse_mode="HTML",
+            reply_markup=get_faq_management_inline_keyboard()
+        )
+    await callback.answer()
 
 
-@router.message(F.text == "🔄 Обновить кэш")
-async def refresh_cache(message: Message):
+@router.callback_query(F.data == "refresh_cache")
+async def callback_refresh_cache(callback: CallbackQuery):
     """Обновление кэша"""
-    if message.from_user.id not in settings.admin_ids:
+    if callback.from_user.id not in settings.admin_ids:
+        await callback.answer("⛔ Нет прав", show_alert=True)
         return
-    
+
+    log.info(f"[Admin] Admin {callback.from_user.id} clicked: refresh_cache")
+
     try:
         await faq_service.clear_cache()
-        await message.answer("✅ Кэш FAQ успешно обновлен")
         log.info("FAQ cache refreshed by admin")
+        try:
+            await callback.message.edit_text(
+                "✅ Кэш FAQ успешно обновлен",
+                reply_markup=get_admin_main_inline_keyboard()
+            )
+        except Exception:
+            await callback.message.answer(
+                "✅ Кэш FAQ успешно обновлен",
+                reply_markup=get_admin_main_inline_keyboard()
+            )
     except Exception as e:
         log.error(f"Error refreshing cache: {e}")
-        await message.answer("⚠️ Ошибка при обновлении кэша")
+        await callback.answer("⚠️ Ошибка при обновлении кэша", show_alert=True)
+
+    await callback.answer()
 
 
-@router.message(F.text == "📤 Экспорт в Google Sheets")
-async def export_to_sheets(message: Message):
+@router.callback_query(F.data == "export_sheets")
+async def callback_export_to_sheets(callback: CallbackQuery):
     """Экспорт заявок в Google Sheets"""
-    if message.from_user.id not in settings.admin_ids:
+    if callback.from_user.id not in settings.admin_ids:
+        await callback.answer("⛔ Нет прав", show_alert=True)
         return
-    
-    await message.answer("⏳ Экспорт заявок в Google Sheets...")
-    
+
+    log.info(f"[Admin] Admin {callback.from_user.id} clicked: export_sheets")
+
     try:
         # Инициализируем Google Sheets
         initialized = await google_sheets_service.initialize()
-        
+
         if not initialized:
-            await message.answer(
+            text = (
                 "⚠️ Google Sheets не настроен.\n\n"
                 "Проверьте:\n"
                 "• GOOGLE_SHEETS_ENABLED=true\n"
                 "• GOOGLE_SHEETS_ID указан\n"
                 "• Файл credentials существует"
             )
+            try:
+                await callback.message.edit_text(text, reply_markup=get_admin_main_inline_keyboard())
+            except Exception:
+                await callback.message.answer(text, reply_markup=get_admin_main_inline_keyboard())
+            await callback.answer()
             return
-        
+
         # Получаем все заявки из БД
         async for db_session in db_adapter.get_session():
             try:
                 from app.database.models import Lead
                 from sqlalchemy import select
-                
+
                 result = await db_session.execute(select(Lead))
                 leads = result.scalars().all()
-                
+
                 exported = 0
                 for lead in leads:
                     success = await google_sheets_service.add_lead(
@@ -250,32 +332,50 @@ async def export_to_sheets(message: Message):
                     )
                     if success:
                         exported += 1
-                
-                await message.answer(
+
+                text = (
                     f"✅ Экспорт завершен!\n\n"
                     f"📝 Экспортировано заявок: {exported}"
                 )
-                
+
+                try:
+                    await callback.message.edit_text(text, reply_markup=get_admin_main_inline_keyboard())
+                except Exception:
+                    await callback.message.answer(text, reply_markup=get_admin_main_inline_keyboard())
+
                 log.info(f"Manual export completed: {exported} leads")
-                
+
             except Exception as e:
                 log.error(f"Error during export: {e}")
-                await message.answer("⚠️ Ошибка при экспорте заявок")
+                text = "⚠️ Ошибка при экспорте заявок"
+                try:
+                    await callback.message.edit_text(text, reply_markup=get_admin_main_inline_keyboard())
+                except Exception:
+                    await callback.message.answer(text, reply_markup=get_admin_main_inline_keyboard())
             break
-    
+
     except Exception as e:
         log.error(f"Error initializing Google Sheets: {e}")
-        await message.answer("⚠️ Ошибка при инициализации Google Sheets")
+        text = "⚠️ Ошибка при инициализации Google Sheets"
+        try:
+            await callback.message.edit_text(text, reply_markup=get_admin_main_inline_keyboard())
+        except Exception:
+            await callback.message.answer(text, reply_markup=get_admin_main_inline_keyboard())
+
+    await callback.answer()
 
 
-@router.message(F.text == "🔧 CRM настройки")
-async def crm_settings(message: Message):
+@router.callback_query(F.data == "crm_settings")
+async def callback_crm_settings(callback: CallbackQuery):
     """Показать настройки CRM"""
-    if message.from_user.id not in settings.admin_ids:
+    if callback.from_user.id not in settings.admin_ids:
+        await callback.answer("⛔ Нет прав", show_alert=True)
         return
-    
+
+    log.info(f"[Admin] Admin {callback.from_user.id} clicked: crm_settings")
+
     backend = "Google Sheets" if settings.GOOGLE_SHEETS_ENABLED else "Локальная БД"
-    
+
     text = (
         f"🔧 <b>Текущий CRM бэкенд:</b> {backend}\n\n"
         f"📋 <b>Доступные бэкенды:</b>\n"
@@ -289,34 +389,11 @@ async def crm_settings(message: Message):
         f"<code>GOOGLE_SHEETS_ENABLED=true/false</code>"
     )
 
-    await message.answer(text)
-
-
-# ========== INLINE КНОПКИ УПРАВЛЕНИЯ FAQ ==========
-
-@router.callback_query(F.data == "faq_management")
-async def callback_faq_management(callback: CallbackQuery):
-    """Главное меню управления FAQ"""
-    if callback.from_user.id not in settings.admin_ids:
-        await callback.answer("⛔ Нет прав", show_alert=True)
-        return
-
-    log.info(f"[FAQ] Admin {callback.from_user.id} opened FAQ management menu")
     try:
-        await callback.message.edit_text(
-            "📝 <b>Управление базой знаний</b>\n\n"
-            "Выберите действие:",
-            parse_mode="HTML",
-            reply_markup=get_faq_management_inline_keyboard()
-        )
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=get_admin_main_inline_keyboard())
     except Exception:
-        # Если сообщение нельзя отредактировать (например, это не то же самое сообщение)
-        await callback.message.answer(
-            "📝 <b>Управление базой знаний</b>\n\n"
-            "Выберите действие:",
-            parse_mode="HTML",
-            reply_markup=get_faq_management_inline_keyboard()
-        )
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=get_admin_main_inline_keyboard())
+
     await callback.answer()
 
 
@@ -525,12 +602,12 @@ async def callback_faq_back_to_admin(callback: CallbackQuery, state: FSMContext)
     try:
         await callback.message.edit_text(
             "🛠 Админ-панель бота\n\nВыберите действие:",
-            reply_markup=get_admin_main_keyboard()
+            reply_markup=get_admin_main_inline_keyboard()
         )
     except Exception:
         await callback.message.answer(
             "🛠 Админ-панель бота\n\nВыберите действие:",
-            reply_markup=get_admin_main_keyboard()
+            reply_markup=get_admin_main_inline_keyboard()
         )
     await callback.answer()
 

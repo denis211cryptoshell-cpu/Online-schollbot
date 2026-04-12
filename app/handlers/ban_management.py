@@ -14,8 +14,8 @@ from app.database.adapter import db_adapter
 from app.database.models import Lead
 from app.database.models_ban import BannedUser
 from app.services.ban_service import ban_service
-from app.keyboards.manager_kb import get_admin_main_keyboard
 from app.keyboards.admin_ban_kb import (
+    get_admin_main_inline_keyboard,
     get_ban_management_keyboard,
     get_ban_confirm_keyboard,
     get_unban_confirm_keyboard,
@@ -51,20 +51,29 @@ class CheckBan(StatesGroup):
 
 # ========== ГЛАВНОЕ МЕНЮ УПРАВЛЕНИЯ БАНАМИ ==========
 
-@router.message(F.text == "🚫 Управление банами")
-async def ban_management(message: Message):
+@router.callback_query(F.data == "ban_management")
+async def ban_management(callback: CallbackQuery):
     """Главное меню управления банами"""
-    if message.from_user.id not in settings.admin_ids:
-        await message.answer("⛔ У вас нет прав администратора.")
+    if callback.from_user.id not in settings.admin_ids:
+        await callback.answer("⛔ Нет прав", show_alert=True)
         return
 
-    log.info(f"Ban management menu opened by admin {message.from_user.id}")
-    await message.answer(
-        "🚫 <b>Управление блокировками</b>\n\n"
-        "Выберите действие:",
-        parse_mode="HTML",
-        reply_markup=get_ban_management_keyboard()
-    )
+    log.info(f"Ban management menu opened by admin {callback.from_user.id}")
+    try:
+        await callback.message.edit_text(
+            "🚫 <b>Управление блокировками</b>\n\n"
+            "Выберите действие:",
+            parse_mode="HTML",
+            reply_markup=get_ban_management_keyboard()
+        )
+    except Exception:
+        await callback.message.answer(
+            "🚫 <b>Управление блокировками</b>\n\n"
+            "Выберите действие:",
+            parse_mode="HTML",
+            reply_markup=get_ban_management_keyboard()
+        )
+    await callback.answer()
 
 
 @router.callback_query(F.data == "ban_back_to_admin")
