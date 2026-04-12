@@ -7,6 +7,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 from app.core.settings import settings
 from app.core.logger import log
+from app.utils.phone_formatter import format_phone_number
 
 
 class GoogleSheetsService:
@@ -88,6 +89,17 @@ class GoogleSheetsService:
             date_str = now.strftime('%d.%m.%Y')
             time_str = now.strftime('%H:%M:%S')
 
+            # Форматируем контакт
+            formatted_contact = format_phone_number(contact)
+            # Убираем = и + в начале (Google Sheets формула)
+            if formatted_contact and formatted_contact[0] in ('=', '+'):
+                formatted_contact = formatted_contact[1:]
+            # Если пусто — подставляем текст
+            if not formatted_contact or not formatted_contact.strip():
+                formatted_contact = "Не указано"
+
+            log.info(f"[Sheets] Contact: raw='{contact}' -> '{formatted_contact}'")
+
             row = [
                 lead_id,
                 date_str,
@@ -95,13 +107,13 @@ class GoogleSheetsService:
                 telegram_id,
                 f"@{username}" if username else "N/A",
                 full_name or "Не указано",
-                contact or "Не указано",
+                formatted_contact,
                 message_text[:500] if message_text else "Не указано",
                 status,
                 language
             ]
 
-            self.sheet.append_row(row)
+            self.sheet.append_row(row, value_input_option='RAW')
             log.info(f"Lead #{lead_id} added to Google Sheets")
             return True
 
@@ -120,8 +132,13 @@ class GoogleSheetsService:
                 log.warning(f"Lead #{lead_id} not found in Google Sheets")
                 return False
 
-            self.sheet.update_cell(cell.row, 7, new_contact)
-            log.info(f"Lead #{lead_id} contact updated in Google Sheets: {new_contact}")
+            formatted_contact = format_phone_number(new_contact)
+            if formatted_contact and formatted_contact[0] in ('=', '+'):
+                formatted_contact = formatted_contact[1:]
+            # Используем update_acell для RAW записи (без интерпретации формул)
+            cell_label = f"G{cell.row}"
+            self.sheet.update(cell_label, [[formatted_contact]], value_input_option="RAW")
+            log.info(f"Lead #{lead_id} contact updated in Google Sheets: {formatted_contact}")
             return True
 
         except Exception as e:
